@@ -3,8 +3,10 @@ import requests
 from user_agent import generate_user_agent
 import re
 
-
 import pandas as pd
+
+from config import logger
+import logging
 
 
 class AgrisupplyScraper:
@@ -25,61 +27,71 @@ class AgrisupplyScraper:
         }
 
     def get_all_products(self):
+        """
+            Obtiene todos los productos de la página y extrae información relevante.
 
-        r = requests.get(self.url, headers=self.headers)
+            Returns:
+                None
+        """
+        try:
+            logging.info(f"Realizando petición {self.url}")
+            r = requests.get(self.url, headers=self.headers)
 
-        # Parsea el HTML con BeautifulSoup
-        soup = BeautifulSoup(r.content, 'html.parser')
+            # Parsea el HTML con BeautifulSoup
+            soup = BeautifulSoup(r.content, 'html.parser')
 
-        # Encuentra todos los elementos div con la clase "product-grid-item p-2 p-md-3"
-        divs = soup.find_all('div', class_='product-grid-item p-2 p-md-3')
+            # Encuentra todos los elementos div con la clase "product-grid-item p-2 p-md-3"
+            divs = soup.find_all('div', class_='product-grid-item p-2 p-md-3')
 
-        # Itera a través de los divs y extrae la información deseada
-        valores_producto = []
-        for div in divs:
-            imagen = div.find('img')['src']
-            nombre_producto = div.find('span', class_='product-name').text
-            precio = div.find('span', class_='hidden hidden-price').text
+            # Itera a través de los divs y extrae la información deseada
+            valores_producto = []
+            for div in divs:
+                imagen = div.find('img')['src']
+                nombre_producto = div.find('span', class_='product-name').text
+                precio = div.find('span', class_='hidden hidden-price').text
 
-            url_producto = div.find('a', class_='d-block gtm-product-click')
-            enlace = url_producto.get('href')
+                url_producto = div.find(
+                    'a', class_='d-block gtm-product-click')
+                enlace = url_producto.get('href')
 
-            if "Ear Tags" in nombre_producto or "EAR TAGS" in nombre_producto:
+                if "Ear Tags" in nombre_producto or "EAR TAGS" in nombre_producto:
+                    print("Imagen:", imagen)
+                    print("Nombre del Producto:", nombre_producto)
+                    print("Enlace:", enlace)
+                    print("Precio:", precio)
 
-                print("Imagen:", imagen)
-                print("Nombre del Producto:", nombre_producto)
-                print("Enlace:", enlace)
-                print("Precio:", precio)
+                    valor = nombre_producto.split("Ear Tags")
+                    if len(valor) == 2:
+                        cantidad = re.findall(r'\d+', valor[1])
+                        print(f"Cantidad: {cantidad[0]}")
 
-                valor = nombre_producto.split("Ear Tags")
-                if len(valor) == 2:
+                    valores_producto = [imagen, nombre_producto,
+                                        enlace, precio, cantidad[0]]
 
-                    cantidad = re.findall(r'\d+', valor[1])
-                    print(f"Cantidad: {cantidad[0]}")
+                    if nombre_producto == "DUFLEX EAR TAGS":
+                        print(f"Cantidad: 24")
+                        marca_nombre = "DUFLEX"
+                        print(f"Marca: {marca_nombre}")
 
-                valores_producto = [imagen, nombre_producto,
-                                    enlace, precio, cantidad[0]]
+                        valores_producto.append(marca_nombre)
 
-                if nombre_producto == "DUFLEX EAR TAGS":
-                    print(f"Cantidad: 24")
-                    marca_nombre = "DUFLEX"
-                    print(f"Marca: {marca_nombre}")
+                    # marca y nombre
+                    marca_nombre = nombre_producto.split("®")
+                    if len(marca_nombre) == 2:
+                        print(f"Marca: {marca_nombre[0]}")
+                        valores_producto.append(marca_nombre[0])
+                    if len(marca_nombre) == 3:
+                        print(f"Marca: {marca_nombre[0]}")
+                        print(f"Nombre: {marca_nombre[1]}")
+                        valores_producto.append(marca_nombre[0])
+                        valores_producto.append(marca_nombre[1])
 
-                    valores_producto.append(marca_nombre)
-
-                # marca y nombre
-                marca_nombre = nombre_producto.split("®")
-                if len(marca_nombre) == 2:
-                    print(f"Marca: {marca_nombre[0]}")
-                    valores_producto.append(marca_nombre[0])
-                if len(marca_nombre) == 3:
-                    print(f"Marca: {marca_nombre[0]}")
-                    print(f"Nombre: {marca_nombre[1]}")
-                    valores_producto.append(marca_nombre[0])
-                    valores_producto.append(marca_nombre[1])
-
-                print("\n")
-                self.datos_productos.append(valores_producto)
+                    print("\n")
+                    self.datos_productos.append(valores_producto)
+        except Exception as e:
+            # Manejar otras excepciones inesperadas
+            logging.error(
+                f"Se produjo una excepción inesperada {self.url}: {str(e)}")
 
     def __obtener_medidas(self, texto):
         # Patrón regex para buscar las medidas en ambos formatos
@@ -92,88 +104,103 @@ class AgrisupplyScraper:
         else:
             return None
 
-    def get_data_product(self):
-        columns = ["Imagen", "Brand", "Nombre", "1-Piece or 2-Piece", "Animal Compatibility", "Blank or Numbered", "Letter or Number Size", "Quantity", "Color",
-                   "Material", "Height", "Length", "Weight", "Width", "Manufacturer", "Part Number", "snap-lock", "longer neck", "UV inhibitors", "Insecticide", "Precio"]
+    def process_data_to_df(self, filename_excel):
+        """
+            Procesa los datos de los productos y los guarda en un archivo Excel.
 
-        df = pd.DataFrame(columns=columns)
-        dfs = []
+            Args:
+                filename_excel (str): Nombre del archivo Excel donde se guardarán los datos.
 
-        for datos in self.datos_productos:
+            Returns:
+                None
+        """
+        try:
+            logging.info("Procesando los datos para crear el df AgriSupply")
+            columns = ["Imagen", "Brand", "Nombre", "1-Piece or 2-Piece", "Animal Compatibility", "Blank or Numbered", "Letter or Number Size", "Quantity", "Color",
+                       "Material", "Height", "Length", "Weight", "Width", "Manufacturer", "Part Number", "snap-lock", "longer neck", "UV inhibitors", "Insecticide", "Precio"]
 
-            r = requests.get(datos[2], headers=self.headers)
-            soup = BeautifulSoup(r.content, 'html.parser')
+            df = pd.DataFrame(columns=columns)
+            dfs = []
 
-            if r.ok:
-                
-                producto = {"Imagen": datos[0], "Precio": datos[3], "Quantity": datos[4], "Brand": datos[5]}
-                if len(datos) == 7:
-                    producto["Nombre"] = datos[6]
-                
-                if "insecticide" in datos[1].lower():
-                    producto["Insecticide"] = "Ok"
-                # Descripcion
-                div_product_desc = soup.find(
-                    'div', class_='product-description mt-2')
+            for datos in self.datos_productos:
 
-                animales = ["Calves", "Cattle",
-                            "Livestock", "Sheep", "Pigs", "Goats"]
+                r = requests.get(datos[2], headers=self.headers)
+                soup = BeautifulSoup(r.content, 'html.parser')
 
-                for div_prod in div_product_desc:
+                if r.ok:
 
-                    texto_div = div_prod.text.strip()
+                    producto = {
+                        "Imagen": datos[0], "Precio": datos[3], "Quantity": datos[4], "Brand": datos[5]}
+                    if len(datos) == 7:
+                        producto["Nombre"] = datos[6]
 
-                    coincidencias = [
-                        animal for animal in animales if animal.lower() in str(texto_div).lower()]
+                    if "insecticide" in datos[1].lower():
+                        producto["Insecticide"] = "Ok"
+                    # Descripcion
+                    div_product_desc = soup.find(
+                        'div', class_='product-description mt-2')
 
-                    if coincidencias:
-                        producto["Animal Compatibility"] = coincidencias
+                    animales = ["Calves", "Cattle",
+                                "Livestock", "Sheep", "Pigs", "Goats"]
 
-                    if "polyurethane" in texto_div.lower():
-                        producto["Material"] = "Polyurethane"
+                    for div_prod in div_product_desc:
 
-                    if "plastic" in texto_div.lower():
-                        producto["Material"] = "Plastic"
+                        texto_div = div_prod.text.strip()
 
-                # Descipcion 2
-                div_product_overview = soup.find('div', class_='col-md-8')
+                        coincidencias = [
+                            animal for animal in animales if animal.lower() in str(texto_div).lower()]
 
-                # Encuentra todos los elementos 'li' dentro del div
-                list_items = div_product_overview.find_all('li')
+                        if coincidencias:
+                            producto["Animal Compatibility"] = coincidencias
 
-                # Recorre los elementos 'li' y obtén su contenido
-                for li in list_items:
-                    
-                    texto_li = li.text.strip()
+                        if "polyurethane" in texto_div.lower():
+                            producto["Material"] = "Polyurethane"
 
-                    if "Size" in texto_li:
+                        if "plastic" in texto_div.lower():
+                            producto["Material"] = "Plastic"
 
-                        medidas = self.__obtener_medidas(texto_li)
+                    # Descipcion 2
+                    div_product_overview = soup.find('div', class_='col-md-8')
 
-                        if "Length" in texto_li:
-                            producto["Length"] = medidas[0]
-                            producto["Width"] = medidas[1]
-                        else:
-                            producto["Width"] = medidas[0]
-                            producto["Height"] = medidas[1]
+                    # Encuentra todos los elementos 'li' dentro del div
+                    list_items = div_product_overview.find_all('li')
 
-                    if "Color" in texto_li:
-                        color = texto_li.split(" ")
-                        producto["Color"] = color[1]
+                    # Recorre los elementos 'li' y obtén su contenido
+                    for li in list_items:
 
-                    if "Snap-Lok" in texto_li:
-                        producto["snap-lock"] = "Ok"
+                        texto_li = li.text.strip()
 
-                    if "blank" in texto_li.lower() or "blank" in datos[1].lower():
-                        producto["Blank or Numbered"] = "Blank"
+                        if "Size" in texto_li:
 
-                    if "numbered" in texto_li.lower():
-                        producto["Blank or Numbered"] = "Numbered"
-                
-                df_producto = pd.DataFrame([producto])
-                dfs.append(df_producto)
-                #df = df.append(producto, ignore_index=True)
-                df = pd.concat(dfs, ignore_index=True)
-                df = df.reindex(columns=columns)
-        
-        return df
+                            medidas = self.__obtener_medidas(texto_li)
+
+                            if "Length" in texto_li:
+                                producto["Length"] = medidas[0]
+                                producto["Width"] = medidas[1]
+                            else:
+                                producto["Width"] = medidas[0]
+                                producto["Height"] = medidas[1]
+
+                        if "Color" in texto_li:
+                            color = texto_li.split(" ")
+                            producto["Color"] = color[1]
+
+                        if "Snap-Lok" in texto_li:
+                            producto["snap-lock"] = "Ok"
+
+                        if "blank" in texto_li.lower() or "blank" in datos[1].lower():
+                            producto["Blank or Numbered"] = "Blank"
+
+                        if "numbered" in texto_li.lower():
+                            producto["Blank or Numbered"] = "Numbered"
+
+                    df_producto = pd.DataFrame([producto])
+                    dfs.append(df_producto)
+                    df = pd.concat(dfs, ignore_index=True)
+                    df = df.reindex(columns=columns)
+            logging.info(f"Se ha guardado la información en {filename_excel}")
+            df.to_excel(filename_excel, index=False)
+        except Exception as e:
+            # Manejar otras excepciones inesperadas
+            logging.error(
+                f"Se produjo una excepción inesperada AgriSupply: {str(e)}")

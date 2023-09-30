@@ -20,7 +20,8 @@ import logging
 class RuralkingScrapper:
 
     def __init__(self):
-        self.url = "https://www.ruralking.com/catalogsearch/result/?&q=ear%20tags&rows=36&view=grid&start=0"
+        # self.url = "https://www.ruralking.com/catalogsearch/result/?&q=ear%20tags&rows=36&view=grid&start=0"
+        self.url = "https://www.ruralking.com/search?searchTerm=ear%2520tag"
         self.lista_productos = []
         self.driver = None
         self.timeout = 10
@@ -40,31 +41,26 @@ class RuralkingScrapper:
         self.start_driver()
         self.driver.get(self.url)
 
-        # Espera a que al menos un elemento con la clase "product-item-photo" esté presente
-        photo_elements = WebDriverWait(self.driver, self.timeout).until(
-            EC.presence_of_all_elements_located(
-                (By.CLASS_NAME, "product-item-photo"))
-        )
+        photo_elements = WebDriverWait(self.driver, self.timeout).until(EC.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, ".MuiCard-root a")))
 
-        productos = []
         # Itera a través de los elementos encontrados
         for photo_element in photo_elements:
-            # Encuentra el elemento img dentro del elemento "photo_element"
-            img_element = photo_element.find_element(By.TAG_NAME, "img")
+            try:
+                # Encuentra el elemento img dentro del elemento "photo_element"
+                img_element = photo_element.find_element(By.TAG_NAME, "img")
 
-            # Obtiene los atributos href, src y alt
-            href = photo_element.get_attribute("href")
-            src_img = img_element.get_attribute("src")
-            titulo_prod = img_element.get_attribute("alt")
+                # Obtiene los atributos href, src y alt
+                href = photo_element.get_attribute("href")
+                src_img = img_element.get_attribute("src")
+                titulo_prod = img_element.get_attribute("alt")
 
-            print("Url-articulo:", href)
-            print("Img-articulo:", src_img)
-            print("titulo-articulo:", titulo_prod)
+                productos = [href, src_img, titulo_prod]
+                self.lista_productos.append(productos)
+            except:
+                pass
 
-            productos = [href, src_img, titulo_prod]
-            self.lista_productos.append(productos)
-
-    def procesar_producto(self):
+    def process_data_to_df(self, filename_excel):
 
         columns = ["Imagen", "Brand", "Nombre", "1-Piece or 2-Piece", "Animal Compatibility", "Blank or Numbered", "Letter or Number Size", "Quantity", "Color",
                    "Material", "Height", "Length", "Weight", "Width", "Manufacturer", "Part Number", "snap-lock", "longer neck", "UV inhibitors", "Insecticide", "Precio"]
@@ -89,30 +85,37 @@ class RuralkingScrapper:
                     self.driver.get(href)
 
                     # precio del producto
-                    elemento_precio = WebDriverWait(self.driver, self.timeout).until(
+                    # elemento_precio = WebDriverWait(self.driver, self.timeout).until(
+                    #    EC.presence_of_element_located(
+                    #        (By.CLASS_NAME, "price-wrapper")))
+                    elemento_precio = WebDriverWait(self.driver, 10).until(
                         EC.presence_of_element_located(
-                            (By.CLASS_NAME, "price-wrapper")
-                        )
+                            (By.CLASS_NAME, "css-epvm6"))
                     )
 
-                    precio = elemento_precio.get_attribute("data-price-amount")
+                    # Obtener el contenido del elemento (que incluye el símbolo "$" y el precio)
+                    precio = elemento_precio.text
+                    precio = precio.replace('\n', '').strip()
                     print(precio)
+                    #########
+
+                    # precio = elemento_precio.get_attribute("data-price-amount")
                     producto["Precio"] = precio
 
                     # descripcion del producto
                     elemento_descripcion = WebDriverWait(self.driver, 10).until(
                         EC.presence_of_element_located(
-                            (By.CSS_SELECTOR, "div.product.attribute.description")
-                        )
-                    )
-
+                            (By.CSS_SELECTOR, "p.MuiTypography-root.MuiTypography-body1.css-cu1ia0")))
+                    
+                    # Obtiene el texto del elemento
                     texto_descripcion = elemento_descripcion.text
-                    print("Descripción:", texto_descripcion)
+
 
                     # obtener quantity
                     if "pack" in titulo_prod.lower():
+                        
                         numero_split = titulo_prod.split("-")[0]
-                        numero = re.findall("\d+", numero)[0]
+                        numero = re.findall("\d+", numero_split)[0]
                         if numero:
                             producto["Quantity"] = numero
 
@@ -167,4 +170,4 @@ class RuralkingScrapper:
                     dfs.append(df_producto)
                     df = pd.concat(dfs, ignore_index=True)
                     df = df.reindex(columns=columns)
-        return df
+        df.to_excel(filename_excel, index=False)

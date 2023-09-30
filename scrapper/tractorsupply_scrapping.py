@@ -97,7 +97,7 @@ class TractorSupplyScraper:
             self.driver.get(url)
 
             # Definir el tiempo máximo de espera en segundos
-            timeout = 20
+            timeout = 15
 
             if self.driver.title == "Access Denied":
                 print("El título de la página es:", self.driver.title)

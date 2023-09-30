@@ -84,14 +84,15 @@ class RunningsScrapper:
             close_button.click()
         except TimeoutException:
             # Manejar una excepción si no se puede encontrar el elemento a tiempo
-            logging.info("El botón de cierre no se encontró a tiempo.")
+            logging.warning("El botón de cierre no se encontró a tiempo.")
         except ElementClickInterceptedException:
             # Manejar una excepción si no se puede hacer clic en el elemento (intercepción de clic)
             logging.info(
                 "No se puede hacer clic en el botón de cierre debido a la intercepción de clic.")
         except Exception as e:
             # Manejar otras excepciones inesperadas
-            logging.error(f"Se produjo una excepción inesperada: {str(e)}")
+            logging.error(
+                f"Se produjo una excepción inesperada al cerrar ventana emergente: {str(e)}")
 
     def count_pagination_tiles(self):
         """
@@ -101,6 +102,7 @@ class RunningsScrapper:
             int: El número de elementos de paginación encontrados.
         """
         try:
+            logging.info("Contanto la cantidad de páginas")
             # contar num de paginas:
             pagination_element = WebDriverWait(self.driver, self.timeout).until(
                 EC.presence_of_element_located(
@@ -120,7 +122,8 @@ class RunningsScrapper:
                 "Se agotó el tiempo de espera al contar las páginas.")
             return 0
         except Exception as e:
-            logging.error(f"Se produjo una excepción inesperada: {str(e)}")
+            logging.error(
+                f"Se produjo una excepción inesperada al contar la catidad de páginas: {str(e)}")
             return 0
 
     def get_product_urls(self):
@@ -131,6 +134,7 @@ class RunningsScrapper:
                 list: Una lista de URLs de productos filtrados.
         """
         try:
+            logging.info("Obteniendo url de los productos")
             wait = WebDriverWait(self.driver, self.timeout)
             elements = wait.until(EC.presence_of_all_elements_located(
                 (By.CLASS_NAME, "item-name-5FM")))
@@ -149,7 +153,8 @@ class RunningsScrapper:
             return []
         except Exception as e:
 
-            logging.error(f"Se produjo una excepción inesperada: {str(e)}")
+            logging.error(
+                f"Se produjo una excepción inesperada al obtener la url del producto: {str(e)}")
             return []
 
     def requests_url(self, url):
@@ -163,6 +168,7 @@ class RunningsScrapper:
                 None
         """
         try:
+            logging.info(f"Se va analizar el sitio {url}")
             self.driver.get(url)
         except TimeoutException:
 
@@ -184,6 +190,7 @@ class RunningsScrapper:
                 None
         """
         try:
+            logging.info(f"Analizando: {url}")
             self.driver.get(url)
             self.close_popup()
 
@@ -202,7 +209,6 @@ class RunningsScrapper:
                 (By.XPATH, '//meta[@name="description"]')))
 
             data_description = meta_element.get_attribute("content")
-            # print("Descripcion: ", data_description)
 
             # detalles del producto
             div_element = wait.until(EC.presence_of_element_located(
@@ -213,7 +219,8 @@ class RunningsScrapper:
                                  data_image_url, data_description, div_text]
             self.lista_productos.append(data_sin_procesar)
         except Exception as e:
-            logging.error(f"Se produjo una excepción inesperada: {str(e)}")
+            logging.error(
+                f"Se produjo una excepción inesperada {url}: {str(e)}")
 
     def process_data_to_df(self, filename_excel):
         """
@@ -226,6 +233,7 @@ class RunningsScrapper:
                 None
         """
         try:
+            logging.info("Procesando los datos para crear el df")
             columns = ["Imagen", "Brand", "Nombre", "1-Piece or 2-Piece", "Animal Compatibility", "Blank or Numbered", "Letter or Number Size", "Quantity", "Color",
                        "Material", "Height", "Length", "Weight", "Width", "Manufacturer", "Part Number", "snap-lock", "longer neck", "UV inhibitors", "Insecticide", "Precio"]
 
@@ -252,17 +260,20 @@ class RunningsScrapper:
                     row_data["Nombre"] = "All-American"
 
                 if "Z Tags" in producto[1]:
-                    row_data["Nombre"] = "Z Tags"
+                    row_data["Brand"] = "Z Tags"
 
                 if "Dominator" in producto[1]:
-                    row_data["Nombre"] = "Dominator"
+                    row_data["Brand"] = "Dominator"
+
+                if "Y-Tags" in producto[1]:
+                    row_data["Brand"] = "Y-Tags"
 
                 matches = re.findall(cantidad_regex, producto[1])
                 if matches:
                     cantidad_por_paquete = int(matches[0])
                     row_data["Quantity"] = cantidad_por_paquete
 
-                if "One-Piece" in producto[1] or "1-piece" in producto[3]:
+                if "One-Piece" in producto[1] or "1-piece" in producto[3] or "1-Piece" in producto[1]:
                     row_data["1-Piece or 2-Piece"] = "1-Piece Design"
 
                 if "2-Piece" in producto[1] or "2-piece" in producto[3]:
@@ -300,7 +311,8 @@ class RunningsScrapper:
 
                 data_rows.append(row_data)
             df_final = pd.DataFrame(data_rows, columns=columns)
-
+            logging.info(f"Se ha guardado la información en {filename_excel}")
             df_final.to_excel(filename_excel, index=False)
         except Exception as e:
-            logging.error(f"Se produjo una excepción inesperada: {str(e)}")
+            logging.error(
+                f"Se produjo una excepción inesperada al procesar los datos: {str(e)}")
