@@ -72,7 +72,7 @@ lista_urls = [
 ]
 for url in lista_urls:
     runnings.get_data_product(url)
-df_runnings = runnings.process_data_to_df()
+runnings.process_data_to_df('runnings.xlsx')
 
 
-df_runnings.to_excel('runnings.xlsx', index=False)
+#df_runnings.to_excel('runnings.xlsx', index=False)
