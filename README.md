@@ -37,6 +37,15 @@ Los datos extraídos se organizan en tablas con las siguientes columnas:
 - Insecticide
 - Precio
 ## Ejecución del Proyecto
+
+#Nota: 
+- Debes cambiar el path de los archivos .xlsx segun el SO que utilice, en mi caso utilizo ubuntu y mi path fue:
+/home/koki/Pictures/projects-python/scrapper-mario/TractorSupply.xlsx
+
+- Asegurate de tener instalado selenium webdriver, en este caso utilice chromedriver
+https://selenium-python.readthedocs.io/installation.html#installing-python-bindings-for-selenium
+
+
 python3 main.py
 
 Contribución
