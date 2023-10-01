@@ -1,0 +1,3 @@
+user-agent==0.1.10
+pandas==1.5.0
+selenium==4.10.0
